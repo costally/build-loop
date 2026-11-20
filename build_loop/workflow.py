@@ -65,14 +65,20 @@ class Workflow:
                 view["manifest_matches"] = False
         approval = view["approval"]
         source = approval.get("source", {}) if approval else {}
+        valid_reply = bool(review and approval and approval.get("authority") == "verified_user_message_binding"
+                           and source.get("thread_id") == review.get("thread_id")
+                           and source.get("text_sha256") == hashlib.sha256(review["approval_text"].encode()).hexdigest())
+        valid_selection = bool(review and approval and approval.get("authority") == "verified_selection_binding"
+                               and source.get("session_id") == review.get("thread_id")
+                               and source.get("question_sha256") == hashlib.sha256(json.dumps(review["question"], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+                               and source.get("answer_sha256") == hashlib.sha256(review["question"]["options"][0]["label"].encode()).hexdigest())
         view["development_allowed"] = bool(
-            review and approval and not view["paused"] and view["manifest_matches"] is True
+            review and approval and not view["paused"] and not view["pending_question"] and view["manifest_matches"] is True
             and review["target"] == "spec-set"
-            and approval.get("authority") == "verified_user_message_binding"
+            and (valid_reply or valid_selection)
             and approval.get("files") == review["files"]
             and approval.get("challenge") == review["challenge"]
-            and source.get("thread_id") == review.get("thread_id")
-            and source.get("text_sha256") == hashlib.sha256(review["approval_text"].encode()).hexdigest())
+            )
         view["blocked_reason"] = "" if view["development_allowed"] else "이 스펙 세트에 연결된 사용자 승인을 확인해야 합니다."
         view["next_action"] = ("사용자 중단 상태 유지" if view["paused"] else
                                "스펙 파일 불일치 확인" if view["manifest_matches"] is False else
@@ -94,7 +100,7 @@ class Workflow:
 
     def ask(self, question, revision):
         def build(view):
-            if view["stage"] != "interview" or view["pending_question"]:
+            if view["pending_question"]:
                 raise StateError("현재 미완료 질문 또는 스펙 검토를 먼저 처리해야 합니다.")
             if set(question) != {"id", "question", "options"}:
                 raise StateError("질문 형식이 올바르지 않습니다.")
@@ -154,6 +160,8 @@ class Workflow:
             payload["thread_id"] = normalized(thread_id)
         payload["approval_text"] = (f"승인 {payload['target']} {payload['version']} "
                                     f"{payload['challenge']}")
+        from .confirmation import question
+        payload["question"] = question(payload["target"], payload["version"], payload["challenge"])
         def build(view):
             if view["pending_question"] or not view["answers"]:
                 raise StateError("확정 답변과 미응답 질문을 먼저 확인해야 합니다.")
@@ -177,7 +185,7 @@ class Workflow:
                     "authority": "observation_only"}
         return self._change(revision, "interview_answer", build)
 
-    def observe_approval(self, client, thread_id, revision):
+    def observe_approval(self, client, thread_id, revision, selection=None):
         """CLI가 선택한 실제 스레드에서 읽은 응답만 저장. 호스트 실증 전 권한 없음."""
         from .probe import observe_user_reply
 
@@ -190,7 +198,11 @@ class Workflow:
             raise StateError("승인 대상 또는 실제 스펙 파일을 확인해 주세요.")
         if review.get("thread_id") and review["thread_id"] != thread_id:
             raise StateError("승인을 요청한 스레드와 응답 스레드가 다릅니다.")
-        receipt = observe_user_reply(client, thread_id, review["approval_text"])
+        if selection:
+            from .confirmation import selected
+            receipt = selected(review, *selection)
+        else:
+            receipt = observe_user_reply(client, thread_id, review["approval_text"])
         if not receipt:
             raise StateError("해당 스펙에 대한 명시적 승인 응답이 없습니다.")
         def build(view):
@@ -200,6 +212,6 @@ class Workflow:
                 raise StateError("동일 승인 관찰이 이미 저장되어 있습니다.")
             return {"target": review["target"], "version": review["version"],
                     "files": review["files"], "challenge": review["challenge"],
-                    "source": receipt, "authority": "verified_user_message_binding" if review["target"] == "spec-set"
+                    "source": receipt, "authority": "verified_selection_binding" if selection and review["target"] == "spec-set" else "verified_user_message_binding" if review["target"] == "spec-set"
                     and review.get("thread_id") == thread_id else "binding_pending_host_validation"}
         return self._change(revision, "spec_approval_observed", build)

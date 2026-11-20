@@ -6,6 +6,7 @@ import hashlib
 import json
 import sqlite3
 import unicodedata
+import secrets
 from contextlib import closing, contextmanager
 from pathlib import Path
 
@@ -141,10 +142,23 @@ class StateStore:
         with self._write(expected_revision) as (db, state):
             return self._event(db, state, "user_reply_observed", payload)
 
-    def pause(self, expected_revision: int):
+    def pause(self, expected_revision: int, reason="user"):
         with self._write(expected_revision) as (db, state):
             db.execute("UPDATE state SET paused=1 WHERE id=1")
-            return self._event(db, state, "paused", {})
+            from .confirmation import question
+            return self._event(db, state, "paused", {"reason": reason, "question": question("중단된 작업 재개", "저장 상태", secrets.token_hex(12))})
+
+    def resume_selection(self, path, session, call, expected_revision):
+        from .confirmation import selected
+        pauses = [json.loads(e["payload"]) for e in self.snapshot()["events"] if e["kind"] == "paused"]
+        if not pauses:
+            raise StateError("중단 기록이 없습니다.")
+        receipt = selected(pauses[-1], path, session, call)
+        with self._write(expected_revision) as (db, state):
+            if not state["paused"]:
+                raise StateError("이미 재개된 상태입니다.")
+            db.execute("UPDATE state SET paused=0 WHERE id=1")
+            return self._event(db, state, "resumed", {"source": receipt})
 
     def begin_recovery(self, identity: dict, expected_revision: int):
         keys = {"project_id", "task_id", "check_id", "failure_category", "environment_id"}
@@ -155,11 +169,33 @@ class StateStore:
         with self._write(expected_revision) as (db, state):
             if state["paused"]:
                 raise StateError("user stopped; no automatic recovery")
+            base = fingerprint
+            cycle = sum(json.loads(row[0]).get("base") == base for row in db.execute("SELECT payload FROM events WHERE kind='recovery_resolved'"))
+            cycle += sum(json.loads(row[0]).get("base") == base for row in db.execute("SELECT payload FROM events WHERE kind='recovery_retry_authorized'"))
+            if cycle:
+                fingerprint = hashlib.sha256(f"{base}:{cycle}".encode()).hexdigest()
             count = db.execute("SELECT count(*) FROM attempts WHERE fingerprint=?", (fingerprint,)).fetchone()[0]
             if count >= 3:
                 raise RecoveryExhausted("same unresolved error reached three recovery attempts")
             db.execute("INSERT INTO attempts(fingerprint,ordinal,result) VALUES(?,?,'unknown')", (fingerprint, count + 1))
-            return self._event(db, state, "recovery_started", {"fingerprint": fingerprint, "attempt": count + 1})
+            return self._event(db, state, "recovery_started", {"fingerprint": fingerprint, "base": base,
+                                                               "identity": identity, "attempt": count + 1})
+
+    def resolve_recovery(self, identity, token, expected_revision):
+        base = hashlib.sha256(json.dumps({k: unicodedata.normalize("NFC", v) for k, v in identity.items()}, sort_keys=True).encode()).hexdigest()
+        with self._write(expected_revision) as (db, state):
+            checks = [json.loads(row[0]) for row in db.execute("SELECT payload FROM events WHERE kind='task_check_finished'")]
+            proof = next((p for p in reversed(checks) if p.get("token") == token), None)
+            if not proof or proof["result"] not in {"passed", "failed"} or proof["task"]["id"] != identity["task_id"] or proof["task"]["environment"] != identity["environment_id"]:
+                raise StateError("해당 오류의 실제 검증 결과 증거가 필요합니다.")
+            starts = [json.loads(row[0]) for row in db.execute("SELECT payload FROM events WHERE kind='recovery_started'")]
+            start = next((p for p in reversed(starts) if p.get("base") == base), None)
+            resolved = [json.loads(row[0]) for row in db.execute("SELECT payload FROM events WHERE kind='recovery_resolved'")]
+            if not start or any(p.get("token") == token or p.get("fingerprint") == start["fingerprint"] for p in resolved):
+                return state["revision"]
+            db.execute("UPDATE attempts SET result=? WHERE fingerprint=? AND ordinal=?", (proof["result"], start["fingerprint"], start["attempt"]))
+            return self._event(db, state, "recovery_resolved" if proof["result"] == "passed" else "recovery_checked", {
+                "base": base, "fingerprint": start["fingerprint"], "token": token, "proof_code": proof["code"]})
 
 
 def require_native_capabilities(evidence: dict):

@@ -7,7 +7,7 @@ if ($sourcePath -eq $targetSystem) { throw 'Run the installed build-loop.cmd dir
 if (Test-Path -LiteralPath $targetSystem) { throw "Existing system preserved: $targetSystem. Choose a separate root for this installation." }
 & python -c "import sys,sqlite3; assert sys.version_info >= (3,13), 'Python 3.13+ required'"
 if ($LASTEXITCODE -ne 0) { throw 'Python runtime check failed.' }
-$includedPaths = @('build_loop','templates','skills','launch.py','build-loop.cmd','README.md','LICENSE','THIRD_PARTY.md')
+$includedPaths = @('build_loop','templates','skills','docs','launch.py','control.py','hook_entry.py','build-loop.cmd','README.md','LICENSE','THIRD_PARTY.md')
 foreach ($entry in $includedPaths) {
  if (-not (Test-Path -LiteralPath (Join-Path $sourcePath $entry))) { throw "Missing release file: $entry" }
 }

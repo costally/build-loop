@@ -22,7 +22,9 @@ description: 아이디어를 인터뷰·승인 스펙·개발·검증·실제 �
 5. QA: 모든 P0 REQ와 POL 위반에 실행 절차·기대 결과를 연결한다.
 6. 스펙 세트: 구조·참조·미정·인수 조건을 확인하고 사용자에게 대상·버전을 보여준 뒤 명시적 승인에 연결한다. 개별 문서 확인을 전체 스펙 승인으로 대신하지 않는다.
 
-각 단계는 guide의 검토 대기를 존중한다. stage-review/stage-confirm은 현재 기술용 확인 경로다. 일반 사용자 응답을 이 경로에서 읽지 못하면 그 한계를 알리고 승인 기록을 꾸미지 않는다.
+각 단계는 guide의 검토 대기를 존중한다. AGENTS.md에 있는 제어 명령과 requests JSON으로 진행한다. stage-review가 반환한 question을 실제 동기 메뉴로 표시하고 stage-selection으로 응답을 연결한다. 스펙 세트는 spec-review/spec-selection, 시연은 demo/demo-selection, 최종 완료는 completion/completion-selection을 사용한다. 이때 session_file/session/call은 실제 호스트 세션의 호출·응답 식별값이다. 원문을 꾸며 저장하지 않는다.
+
+수정 필요·자유 의견은 확인이 아니다. 저장된 feedback을 반영하고 같은 단계에서 다시 검토한다. 승인 뒤 변경은 change-review/change-apply로 CR과 실제 사용자 응답·변경 파일을 묶는다. 실패 한도 또는 미확인 실행은 recovery-review/recovery-selection으로 이전 프로세스 종료·새 시도 근거를 확인한다. 사용자가 중단하면 Interrupt 훅이 상태를 보존하며, 재개는 저장된 질문과 resume-selection으로 연결한다.
 
 ## 개발과 결과물
 

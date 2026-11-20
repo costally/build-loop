@@ -2,13 +2,19 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from .state import StateError
 
 
 def read_selection(path: Path, session_id: str, call_id: str, question_id: str):
-    with path.open(encoding="utf-8") as stream:
+    home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    sessions = home / "sessions"
+    actual = path.resolve(strict=True)
+    if actual.suffix != ".jsonl" or not actual.is_relative_to(sessions.resolve()):
+        raise StateError("응답은 현재 호스트의 Codex sessions 기록에서만 읽을 수 있습니다.")
+    with actual.open(encoding="utf-8") as stream:
         records = [json.loads(line) for line in stream if line.strip()]
     metadata = [r.get("payload", {}) for r in records if r.get("type") == "session_meta"]
     if len(metadata) != 1 or metadata[0].get("id") != session_id:
@@ -39,15 +45,22 @@ def read_selection(path: Path, session_id: str, call_id: str, question_id: str):
     if set(answers) != {question_id}:
         raise StateError("selection answer missing or unrelated")
     values = answers[question_id].get("answers", [])
-    if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], str) or not values[0].strip():
+    if not isinstance(values, list) or not values or any(not isinstance(value, str) for value in values):
+        raise StateError("selection answer empty or ambiguous")
+    if len(values) == 1 and values[0].strip() and values[0] not in {"None of the above", "Other"}:
+        text = values[0]
+    elif len(values) == 2 and values[1].startswith("user_note:") and values[1].split(":", 1)[1].strip():
+        note = values[1].split(":", 1)[1].strip()
+        text = note if values[0] in {"None of the above", "Other"} else values[0] + "\n의견: " + note
+    else:
         raise StateError("selection answer empty or ambiguous")
     question = questions[0]
     digest = hashlib.sha256(json.dumps(question, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     receipt = {"kind": "selection_observation", "authority": "observation_only",
             "session_id": session_id, "turn_id": turn, "call_id": call_id,
             "question_id": question_id, "question_sha256": digest,
-            "answer_sha256": hashlib.sha256(values[0].encode()).hexdigest()}
-    return receipt, question, values[0]
+            "answer_sha256": hashlib.sha256(text.encode()).hexdigest()}
+    return receipt, question, text
 
 
 def observe_selection(path: Path, session_id: str, call_id: str, question_id: str):

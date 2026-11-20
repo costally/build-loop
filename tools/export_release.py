@@ -11,8 +11,8 @@ def export(destination, specs):
     if destination.exists():
         raise FileExistsError("existing release directory preserved")
     destination.mkdir(parents=True)
-    entries = ["build_loop", "tests", "tools", "templates", "skills", ".github", "launch.py", "build-loop.cmd",
-               "install.ps1", "LICENSE", "THIRD_PARTY.md"]
+    entries = ["build_loop", "tests", "tools", "templates", "skills", "docs", ".github", "launch.py", "build-loop.cmd",
+               "install.ps1", "control.py", "hook_entry.py", "LICENSE", "THIRD_PARTY.md"]
     for name in entries:
         origin = source / name
         target = destination / name

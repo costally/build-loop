@@ -1,0 +1,5 @@
+[verify]
+repo = "."
+requirements_dirs = []
+env_known_files = ["docs/runtime-environment.md"]
+env_hint = "Known process and host variables; no global env changes."

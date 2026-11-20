@@ -61,7 +61,7 @@ def diagnose(executable: Path, thread_id: str | None = None, expected_reply: str
         "native_capabilities": {k: "unverified" for k in [
             "selection_ui", "verified_user_source", "guard_enforcement", "resume",
         ]},
-        "approval_binding": "not implemented; reply observation cannot authorize a transition",
+        "approval_binding": "implemented in workflow/confirmation; this read-only observation alone cannot authorize a transition",
         "ready_for_managed_work": False,
     }
     try:

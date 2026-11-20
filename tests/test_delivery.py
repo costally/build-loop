@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from build_loop.delivery import Delivery
-from build_loop.state import StateStore, StateError
+from build_loop.state import StateStore, StateError, RecoveryExhausted
 from build_loop.workflow import manifest
 from build_loop.workflow import Workflow
 from build_loop.director import guide, STAGES, request_stage_review, confirm_stage
@@ -154,3 +154,17 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(reopened.status()["current_task"]["result"], "unknown")
         with self.assertRaises(StateError):
             reopened.run_check("task-001", 2)
+
+    @patch("build_loop.delivery.Workflow.status")
+    def test_actual_failed_checks_consume_three_recoveries_and_no_more(self, status):
+        status.side_effect = self.fake_flow
+        self.app.write_text("raise SystemExit(1)", encoding="utf-8")
+        self.plan()
+        self.delivery.run_check("task-001", self.store.snapshot()["revision"])
+        for attempt in range(3):
+            self.delivery.run_check("task-001", self.store.snapshot()["revision"])
+        snapshot = self.store.snapshot()
+        self.assertEqual(len(snapshot["attempts"]), 3)
+        self.assertTrue(all(attempt["result"] == "failed" for attempt in snapshot["attempts"]))
+        with self.assertRaises(RecoveryExhausted):
+            Delivery(StateStore(self.root, enabled=True)).run_check("task-001", snapshot["revision"])

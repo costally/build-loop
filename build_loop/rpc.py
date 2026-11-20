@@ -20,6 +20,7 @@ class ReadOnlyCodex:
     METHODS = frozenset({
         "initialize", "thread/read", "thread/turns/list", "thread/items/list",
         "experimentalFeature/list",
+        "hooks/list",
     })
 
     def __init__(self, executable: Path, timeout: float = 20.0):

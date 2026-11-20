@@ -78,3 +78,15 @@ class SpecGuardTests(unittest.TestCase):
                                 input=b"bad", capture_output=True, check=True, timeout=10,
                                 cwd=Path(__file__).resolve().parents[1])
         self.assertEqual(json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_nonvisual_contract_is_checked_without_fake_screens(self):
+        self.write("00-brief.md", "브리프")
+        self.write("01-prd.md", "### REQ-001 동작\n- [ ] 첫 조건\n- [ ] 두번째 조건\nPOL-001 TC-001")
+        self.write("02-policy.md", "### POL-001 규칙\n규칙 적용 시점 위반 예외 의사코드 TC-001")
+        self.write("03-ia.md", "04-interactions/REQ-001-operation.md")
+        self.write("05-qa-tc.md", "### TC-001 시험\nREQ-001 POL-001")
+        text = "REQ-001 입력 예시 출력 예시 실행 순서 기본 실행중 입력없음 실패 오류 POL-001 TC-001"
+        self.write("04-interactions/REQ-001-operation.md", text)
+        self.assertTrue(inspect_spec(self.root)["structural_passed"])
+        self.write("04-interactions/REQ-001-operation.md", text.replace("출력", ""))
+        self.assertFalse(inspect_spec(self.root)["structural_passed"])

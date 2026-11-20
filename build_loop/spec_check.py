@@ -39,9 +39,20 @@ def inspect_spec(project, docs="docs"):
         if len(matches) != len(set(matches)):
             issues.append(f"duplicate_definition:{prefix}")
     screens = sorted((directory / "04-screens").glob("SCR-*.md"))
+    interactions = sorted((directory / "04-interactions").glob("REQ-*.md"))
     defined["SCR"] = set()
-    if not screens:
-        issues.append("screen_or_nonvisual_contract_required:nonvisual_validator_not_implemented")
+    if not screens and not interactions:
+        issues.append("screen_or_nonvisual_contract_required")
+    for path in interactions:
+        text = read(path)
+        texts[path.name] = text
+        compact = text.replace(" ", "")
+        for marker in ["입력", "출력", "실행", "기본", "실행중", "입력없음", "실패", "오류", "POL-", "TC-"]:
+            if marker not in compact:
+                issues.append(f"missing_interaction_element:{path.name}:{marker}")
+        req = re.match(r"REQ-\d+", path.name)[0]
+        if req not in text or path.name not in texts["03-ia.md"]:
+            issues.append(f"unlinked_interaction:{path.name}")
     index = read(directory / "04-screens" / "index.html") if screens else ""
     for path in screens:
         screen = path.name.split("-", 2)

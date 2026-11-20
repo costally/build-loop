@@ -1,9 +1,12 @@
 import json
 import tempfile
+import os
+from unittest.mock import patch
 import unittest
 from pathlib import Path
 
 from build_loop.selection import observe_selection
+from build_loop.selection import read_selection
 from build_loop.state import StateError
 from build_loop.guard import decision
 from build_loop.state import StateStore
@@ -14,7 +17,11 @@ class SelectionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.path = Path(self.temp.name) / "session.jsonl"
+        self.environment = patch.dict(os.environ, {"CODEX_HOME": self.temp.name})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.path = Path(self.temp.name) / "sessions/session.jsonl"
+        self.path.parent.mkdir()
         self.rows = [
             {"type": "session_meta", "payload": {"id": "s1"}},
             {"type": "turn_context", "payload": {"turn_id": "t1"}},
@@ -54,11 +61,25 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(StateError):
             self.observe()
 
+    def test_freeform_opinion_is_preserved_without_auto_accepting_recommendation(self):
+        self.rows[3]["payload"]["output"] = json.dumps({"answers": {"q1": {"answers": ["None of the above", "user_note: 더 간단하게"]}}})
+        self.observe()
+        receipt, question, text = read_selection(self.path, "s1", "c1", "q1")
+        self.assertEqual(text, "더 간단하게")
+        self.assertEqual(receipt["authority"], "observation_only")
+
+    def test_agent_created_project_file_is_not_a_host_selection(self):
+        self.observe()
+        forged = Path(self.temp.name) / "fake.jsonl"
+        forged.write_bytes(self.path.read_bytes())
+        with self.assertRaises(StateError):
+            observe_selection(forged, "s1", "c1", "q1")
+
     def test_native_read_and_sync_menu_preserved_shell_denied(self):
         root = Path(self.temp.name)
-        for tool in ["Read", "Glob", "Grep", "request_user_input"]:
+        for tool in ["Read", "Glob", "Grep"]:
             self.assertEqual(decision(root, {"tool_name": tool}), {})
-        for tool in ["Bash", "Write", "Edit", "request_user_input_async", "mcp_fake_Read"]:
+        for tool in ["Bash", "Write", "Edit", "request_user_input", "request_user_input_async", "mcp_fake_Read"]:
             self.assertEqual(decision(root, {"tool_name": tool})["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_selection_is_saved_and_pending_question_cleared_on_resume(self):

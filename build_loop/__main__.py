@@ -28,6 +28,8 @@ def main():
     projects.add_argument("--root", type=Path, default=Path("C:/build-loop"))
     guide_parser = subs.add_parser("guide")
     guide_parser.add_argument("--project", type=Path, required=True)
+    attach_parser = subs.add_parser("attach")
+    attach_parser.add_argument("--project", type=Path, required=True)
     delivery = subs.add_parser("delivery")
     delivery.add_argument("--project", type=Path, required=True)
     delivery_actions = delivery.add_subparsers(dest="delivery_action", required=True)
@@ -103,6 +105,13 @@ def main():
     approval.add_argument("--codex", type=Path, required=True)
     approval.add_argument("--revision", type=int, required=True)
     args = parser.parse_args()
+    if args.command == "attach":
+        if os.getenv("BUILD_LOOP_EXPERIMENT_ENABLED") != "1":
+            from .state import StateError
+            raise StateError("writes are disabled")
+        from .harness import attach
+        print(json.dumps(attach(args.project), ensure_ascii=False, indent=2))
+        return 0
     if args.command == "projects":
         directory = args.root.resolve(strict=True) / "projects"
         paths = sorted(str(p.resolve()) for p in directory.iterdir()

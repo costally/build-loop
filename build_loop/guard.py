@@ -1,33 +1,15 @@
-"""실험용 개발 진입 검사. 준비되지 않은 호스트는 항상 거절한다."""
+"""네이티브 PreToolUse 정책의 독립 실행 진입점."""
 
 import argparse
 import json
 import sys
-import sqlite3
 from pathlib import Path
 
-from .state import StateStore, StateError
-from .workflow import Workflow
-
-
-def decision(project, payload=None):
-    # Only intrinsically read-only native tools bypass the development gate.
-    # Shells and arbitrary MCP tools can write, even when their names sound read-only.
-    if payload:
-        tool = payload.get("tool_name")
-        if tool in {"Read", "Glob", "Grep", "request_user_input"}:
-            return {}
-    try:
-        view = Workflow(StateStore(project)).status()
-        reason = view["next_action"] + ": " + view["blocked_reason"]
-    except (OSError, ValueError, StateError, sqlite3.DatabaseError) as exc:
-        reason = "프로젝트 상태를 확인할 수 없습니다: " + type(exc).__name__
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse",
-            "permissionDecision": "deny", "permissionDecisionReason": reason}}
+from .policy import decision
 
 
 def main():
-    parser = argparse.ArgumentParser(description="experimental development-only guard")
+    parser = argparse.ArgumentParser(description="build-loop PreToolUse guard")
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args()
     try:
