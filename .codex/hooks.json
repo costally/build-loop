@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "python workspace_hook.py", "commandWindows": "python workspace_hook.py", "timeout": 10}]}],
+    "PreToolUse": [{"hooks": [{"type": "command", "command": "python workspace_hook.py", "commandWindows": "python workspace_hook.py", "timeout": 10}]}],
+    "PostToolUse": [{"hooks": [{"type": "command", "command": "python workspace_hook.py", "commandWindows": "python workspace_hook.py", "timeout": 10}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "python workspace_hook.py", "commandWindows": "python workspace_hook.py", "timeout": 10}]}],
+    "Interrupt": [{"hooks": [{"type": "command", "command": "python workspace_hook.py", "commandWindows": "python workspace_hook.py", "timeout": 3}]}]
+  }
+}

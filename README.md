@@ -6,18 +6,17 @@
 
 ## 시작
 
-처음 사용하는 분은 **[처음 사용하기 — 다운로드부터 카운터 예제 완성까지](docs/getting-started.md)**를 따라가세요. ZIP 다운로드, PowerShell 실행, Codex에서 프로젝트 열기, 승인과 재개 방법을 안내합니다.
+처음 사용하는 분은 **[처음 사용하기](docs/getting-started.md)**를 따라가세요. 다운로드한 폴더에서 Codex를 열고 아이디어를 말하면 같은 대화에서 구현까지 진행합니다.
 
 Windows에서 Python 3.13 이상, Git, Codex가 필요합니다. 추가 Python 패키지는 없습니다.
 
 ```powershell
 git clone https://github.com/costally/build-loop.git
 cd build-loop
-.\build-loop.cmd --help
-.\build-loop.cmd start --name my-project --idea "만들고 싶은 것을 적으세요"
+codex
 ```
 
-기본 루트 `C:\build-loop`가 없으면 먼저 폴더를 만드세요. 생성된 프로젝트를 Codex 작업 폴더로 열고 `시작`이라고 요청하세요. 프로젝트의 AGENTS.md와 저장된 guide가 첫 미완료 작업을 안내합니다. 기존 PowerShell의 codex 함수나 전역 Codex 설정은 바꾸지 않습니다.
+Codex에 **“웹페이지 메모장 만들자”**처럼 요청하세요. 작업 자료는 이 폴더 안의 `projects/<이름>/`에 만들어지며, 현재 세션을 유지해 첫 미완료 작업부터 진행합니다. 별도 프로젝트 생성 명령이나 폴더 이동은 필요하지 않습니다. 프로젝트와 루트 훅의 정상 신뢰 검토가 필요합니다. 기존 PowerShell의 codex 함수나 전역 Codex 설정은 바꾸지 않습니다.
 
 원하는 경우 본체를 기본 위치에 설치합니다.
 
@@ -29,8 +28,9 @@ C:\build-loop\system\build-loop.cmd projects
 설치는 기존 system 폴더를 덮어쓰지 않습니다. 별도 설치는 `install.ps1 -Root <다른경로>`를 사용합니다. 사용자 프로젝트는 본체와 분리합니다.
 
 ```text
-C:/build-loop/
-  system/                 도구 소스·템플릿·실행 명령
+다운로드한 폴더/
+  AGENTS.md 등            시작 지침·도구 소스·템플릿·실행 명령
+  .build-loop/            현재 작업공간의 세션별 프로젝트 연결, Git 제외
   projects/<name>/
     docs/                 브리프·PRD·정책·화면/동작·QA
     code/                 실제 결과물

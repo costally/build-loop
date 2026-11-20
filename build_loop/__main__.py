@@ -19,6 +19,8 @@ def main():
     from . import __version__
     parser.add_argument("--version", action="version", version=__version__)
     subs = parser.add_subparsers(dest="command", required=True)
+    begin_parser = subs.add_parser("begin", help="현재 다운로드 폴더의 세션에서 프로젝트 시작/재개")
+    begin_parser.add_argument("--session", required=True)
     start = subs.add_parser("start")
     start.add_argument("--root", type=Path, default=Path("C:/build-loop"))
     start.add_argument("--name", required=True)
@@ -111,6 +113,12 @@ def main():
             raise StateError("writes are disabled")
         from .harness import attach
         print(json.dumps(attach(args.project), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "begin":
+        from .workspace import begin
+        print(json.dumps(begin(Path(__file__).resolve().parents[1], args.session,
+                               enabled=os.getenv("BUILD_LOOP_EXPERIMENT_ENABLED") == "1"),
+                         ensure_ascii=False, indent=2))
         return 0
     if args.command == "projects":
         directory = args.root.resolve(strict=True) / "projects"
