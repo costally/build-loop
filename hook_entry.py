@@ -11,7 +11,8 @@ parser.add_argument("--project", required=True)
 args = parser.parse_args()
 payload = {}
 try:
-    payload = json.load(sys.stdin)
+    # Codex sends UTF-8 even when Windows gives Python a different pipe encoding.
+    payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     result = handle(args.project, payload)
 except Exception:
     event = payload.get("hook_event_name") if isinstance(payload, dict) else None

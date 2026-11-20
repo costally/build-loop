@@ -35,13 +35,17 @@ class ManagedFlowTests(unittest.TestCase):
     def select(self, question, answer=None):
         self.calls += 1
         call = f"call-{self.calls}"
+        arguments = {"questions": [dict(question, isOther=True, isSecret=False)]}
+        payload = {"cwd": str(self.project), "session_id": "s1", "transcript_path": str(self.session),
+                   "tool_use_id": call, "tool_name": "request_user_input", "tool_input": arguments}
+        self.assertEqual(handle(self.project, dict(payload, hook_event_name="PreToolUse")), {})
         self.rows += [{"type": "turn_context", "payload": {"turn_id": f"turn-{self.calls}"}},
                       {"type": "response_item", "payload": {"type": "function_call", "call_id": call,
-                       "name": "request_user_input", "arguments": json.dumps({"questions": [question]})}},
+                       "name": "request_user_input", "arguments": json.dumps(arguments)}},
                       {"type": "response_item", "payload": {"type": "function_call_output", "call_id": call,
                        "output": json.dumps({"answers": {question["id"]: {"answers": [answer or question["options"][0]["label"]]}}})}}]
         self.session.write_text("\n".join(json.dumps(row) for row in self.rows), encoding="utf-8")
-        return {"session_file": str(self.session), "session": "s1", "call": call}
+        handle(self.project, dict(payload, hook_event_name="PostToolUse"))
 
     def control(self, data, expected=0):
         data.setdefault("revision", self.revision())
@@ -79,10 +83,12 @@ class ManagedFlowTests(unittest.TestCase):
                 (screens / "SCR-001-main.html").write_text("[1]", encoding="utf-8")
                 (screens / "index.html").write_text("SCR-001-main.html", encoding="utf-8")
             request = self.control({"action": "stage-review", "stage": stage, "thread": "s1"})
-            self.control({"action": "stage-selection", "stage": stage, **self.select(request["question"])})
+            self.select(request["question"])
+            self.control({"action": "stage-selection", "stage": stage})
         self.control({"action": "spec-review", "version": "v1.0", "thread": "s1"})
         request = Workflow(self.store).status()["review"]
-        self.control({"action": "spec-selection", **self.select(request["question"])})
+        self.select(request["question"])
+        self.control({"action": "spec-selection"})
 
     def test_interview_to_completion_through_real_windows_controller(self):
         for index in range(10):
@@ -90,7 +96,8 @@ class ManagedFlowTests(unittest.TestCase):
                 {"label": "첫 항목 (추천)", "description": "작은 범위로 진행"}, {"label": "다른 항목", "description": "범위를 변경"}]}
             self.control({"action": "question", "question": question})
             self.assertEqual(guide(self.project)["question"], question)
-            self.control({"action": "selection", "question": question["id"], **self.select(question)})
+            self.select(question)
+            self.control({"action": "selection", "question": question["id"]})
         self.documents()
         self.assertTrue(Workflow(self.store).status()["development_allowed"])
         task = {"id": "TASK-001", "req": "REQ-001", "tc": "TC-001", "title": "실행", "acceptance": "출력 검증",
@@ -101,19 +108,22 @@ class ManagedFlowTests(unittest.TestCase):
         path.write_text("assert 1 + 1 == 2\nprint('verified')", encoding="utf-8")
         self.control({"action": "check", "task": "TASK-001"})
         rejected_demo = self.control({"action": "demo", "thread": "s1"})
-        self.control({"action": "demo-selection", **self.select(rejected_demo["question"], "수정 필요")})
+        self.select(rejected_demo["question"], "수정 필요")
+        self.control({"action": "demo-selection"})
         self.assertFalse(guide(self.project)["complete"])
         self.assertEqual(handle(self.project, {"hook_event_name": "Stop", "cwd": str(self.project)})["decision"], "block")
         self.control({"action": "check", "task": "TASK-001"})
         for kind in ["demo", "completion"]:
             request = self.control({"action": kind, "thread": "s1"})
-            self.control({"action": kind + "-selection", **self.select(request["question"])})
+            self.select(request["question"])
+            self.control({"action": kind + "-selection"})
         self.assertTrue(guide(self.project)["complete"])
         payload = {"hook_event_name": "Stop", "cwd": str(self.project)}
         self.assertEqual(handle(self.project, payload), {})
         handle(self.project, {"hook_event_name": "Interrupt", "cwd": str(self.project)})
         request = guide(self.project)["question"]
-        self.control({"action": "resume-selection", **self.select(request)})
+        self.select(request)
+        self.control({"action": "resume-selection"})
         self.assertTrue(guide(self.project)["complete"])
         cr = self.project / "docs/changes/open/CR-001.md"
         cr.parent.mkdir(parents=True)
@@ -121,7 +131,8 @@ class ManagedFlowTests(unittest.TestCase):
         prd = self.project / "docs/01-prd.md"
         request = self.control({"action": "change-review", "cr": "docs/changes/open/CR-001.md",
                                 "files": {"docs/01-prd.md": prd.read_text(encoding="utf-8") + "\n표현 정정\n"}, "version": "v1.1", "thread": "s1"})
-        self.control({"action": "change-apply", **self.select(request["question"])})
+        self.select(request["question"])
+        self.control({"action": "change-apply"})
         self.assertTrue(Workflow(self.store).status()["development_allowed"])
         self.assertFalse(guide(self.project)["complete"])
         self.assertTrue((self.project / "docs/changes/merged/CR-001.md").is_file())
@@ -143,12 +154,14 @@ class ManagedFlowTests(unittest.TestCase):
         brief = self.project / "docs/00-brief.md"
         brief.write_text("# 초안", encoding="utf-8")
         request = self.control({"action": "stage-review", "stage": "brief", "thread": "s1"})
-        self.control({"action": "stage-selection", "stage": "brief", **self.select(request["question"], "수정 필요")})
+        self.select(request["question"], "수정 필요")
+        self.control({"action": "stage-selection", "stage": "brief"})
         self.assertEqual(guide(self.project)["action_kind"], "revise")
         self.assertEqual(guide(self.project)["feedback"]["text"], "수정 필요")
         brief.write_text("# 수정안", encoding="utf-8")
         new_request = self.control({"action": "stage-review", "stage": "brief", "thread": "s1"})
-        self.control({"action": "stage-selection", "stage": "brief", **self.select(request["question"])}, expected=2)
+        self.control({"action": "stage-selection", "stage": "brief"}, expected=2)
         self.assertEqual(guide(self.project)["stage"], "brief")
-        self.control({"action": "stage-selection", "stage": "brief", **self.select(new_request["question"])})
+        self.select(new_request["question"])
+        self.control({"action": "stage-selection", "stage": "brief"})
         self.assertEqual(guide(self.project)["stage"], "prd")

@@ -11,7 +11,7 @@ guide 응답의 request_help에 제어 요청 계약이 있다. Read가 없으�
 
 ## 인터뷰
 
-이미 알려진 사실은 재질문하지 않는다. 누가 무엇을 하다 막혔는지 실제 사례부터 구체화한다. 한 번에 한 결정을 2~3개 선택지로 묻고 첫 선택지에 추천·이유를 넣는다. 질문을 workflow ask로 저장한 후 실제 동기 request_user_input을 호출한다. 답변을 같은 질문 ID에 연결해 저장한다. 미지원·빈 응답은 질문을 보존하고 필요한 복구 위치를 알린다. 텍스트 목록을 선택 메뉴로 위장하지 않는다.
+이미 알려진 사실은 재질문하지 않는다. 누가 무엇을 하다 막혔는지 실제 사례부터 구체화한다. 한 번에 한 결정을 2~3개 선택지로 묻고 첫 선택지에 추천·이유를 넣는다. 질문을 저장한 후 실제 동기 request_user_input을 호출한다. 응답을 받으면 같은 턴에 selection 요청으로 현재 revision과 질문 ID를 전달한다. 제어기가 실제 호스트 기록을 찾아 저장한다. 미지원·빈 응답은 질문을 보존하고 필요한 복구 위치를 알린다. 텍스트 목록을 선택 메뉴로 위장하지 않는다.
 
 ## 기획
 
@@ -24,7 +24,7 @@ guide 응답의 request_help에 제어 요청 계약이 있다. Read가 없으�
 5. QA: 모든 P0 REQ와 POL 위반에 실행 절차·기대 결과를 연결한다.
 6. 스펙 세트: 구조·참조·미정·인수 조건을 확인하고 사용자에게 대상·버전을 보여준 뒤 명시적 승인에 연결한다. 개별 문서 확인을 전체 스펙 승인으로 대신하지 않는다.
 
-각 단계는 guide의 검토 대기를 존중한다. AGENTS.md에 있는 제어 명령과 requests JSON으로 진행한다. stage-review가 반환한 question을 실제 동기 메뉴로 표시하고 stage-selection으로 응답을 연결한다. 스펙 세트는 spec-review/spec-selection, 시연은 demo/demo-selection, 최종 완료는 completion/completion-selection을 사용한다. 이때 session_file/session/call은 실제 호스트 세션의 호출·응답 식별값이다. 원문을 꾸며 저장하지 않는다.
+각 단계는 guide의 검토 대기를 존중한다. AGENTS.md에 있는 제어 명령과 requests JSON으로 진행한다. stage-review가 반환한 question을 실제 동기 메뉴로 표시하고 stage-selection으로 응답을 연결한다. 스펙 세트는 spec-review/spec-selection, 시연은 demo/demo-selection, 최종 완료는 completion/completion-selection을 사용한다. 세션 파일·호출 ID는 제어기가 찾는다. 이전 프로젝트 지침에 식별값이 필요하다고 적혀 있으면 현재 guide의 request_help를 따른다.
 
 수정 필요·자유 의견은 확인이 아니다. 저장된 feedback을 반영하고 같은 단계에서 다시 검토한다. 승인 뒤 변경은 change-review/change-apply로 CR과 실제 사용자 응답·변경 파일을 묶는다. 실패 한도 또는 미확인 실행은 recovery-review/recovery-selection으로 이전 프로세스 종료·새 시도 근거를 확인한다. 사용자가 중단하면 Interrupt 훅이 상태를 보존하며, 재개는 저장된 질문과 resume-selection으로 연결한다.
 

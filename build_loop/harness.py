@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .policy import decision, write_paths, control_command
+from .menu_input import menu_tool_name
 from .state import StateStore, StateError
 
 
@@ -119,6 +120,19 @@ def handle(project, payload):
               "decision": result.get("hookSpecificOutput", {}).get("permissionDecision", result.get("decision", "observe"))}
     if event == "Stop":
         record.update(stop_signature=stop_signature, stop_repeats=stop_repeats)
+    tool = menu_tool_name(record["tool"])
+    if record["decision"] == "observe" and (
+        (event == "PostToolUse" and tool == "request_user_input")
+        or (event == "PreToolUse" and tool in {"Bash", "exec_command"})
+    ):
+        session, transcript = payload.get("session_id"), payload.get("transcript_path")
+        if isinstance(session, str) and session and isinstance(transcript, str) and transcript:
+            record["selection_log"] = {"session": session, "path": transcript}
+            if event == "PostToolUse":
+                result["hookSpecificOutput"]["additionalContext"] += (
+                    "\n메뉴가 응답을 반환했다면 control-requests.md의 해당 *-selection/selection 요청으로 연결하세요. "
+                    "제어기가 호스트 기록에서 호출과 응답을 찾습니다."
+                )
     with destination.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(record) + "\n")
     return result

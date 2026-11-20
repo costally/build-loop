@@ -142,7 +142,7 @@ def create_project(root, name, idea, template_root, *, enabled=False):
 - 제어 요청의 정확한 인수는 guide의 request_help 파일에 있다. Read가 없으면 `Get-Content -LiteralPath "<request_help 전체 경로>" -Encoding UTF8`로 읽는다. question 객체의 필수 필드는 id/question/options, 선택 필드는 header(12자 이하)다. 입력 형식 오류를 구현 실패 복구 횟수와 혼동하지 않는다. 기획 중에는 recovery-review를 호출하지 않는다.
 
 - 질문을 표시하기 전에 workflow ask로 질문 ID·문구·선택지를 저장한다. 출력한 질문과 저장한 질문을 동일하게 유지한다.
-- 동기 메뉴 응답은 workflow capture-selection의 session-file/session/call/question으로 대조·저장한다. 일반 메시지는 workflow answer로 지정 스레드에서 실제 응답을 읽는다. 선택을 받지 못하면 저장하지 않는다.
+- 동기 메뉴 응답은 selection에 revision과 질문 ID를 넣어 대조·저장한다. 제어기가 해당 프로젝트의 훅과 호스트 기록을 읽는다. 선택을 받지 못하면 저장하지 않는다.
 - guide의 action_kind=draft이면 담당 스킬로 해당 산출물을 작성한다. action_kind=review이면 문서를 먼저 보여주고 stage-review로 대상 파일·스레드를 연결한다. 사용자의 실제 확인 응답을 stage-confirm으로 읽은 뒤 guide를 다시 실행한다.
 - 각 쓰기에는 현재 revision을 사용한다. 충돌하면 최신 guide를 읽고 중복 작업하지 않는다. 쓰기 기능은 현재 작업 프로세스의 BUILD_LOOP_EXPERIMENT_ENABLED=1에서만 사용한다. 전역 설정은 바꾸지 않는다.
 - 현재 stage-review가 생성하는 확인 문자열은 개발 버전의 대상 연결 방식이다. 이를 사용자가 이미 했던 일반 승인과 혼동하지 않는다. 사용자 친화적인 문맥 승인·호스트 승인 UI 통합이 완료됐다고 말하지 않는다.
@@ -153,11 +153,11 @@ def create_project(root, name, idea, template_root, *, enabled=False):
 
 상태를 바꾸려면 .build-loop/requests/요청명.json을 Write 또는 apply_patch로 작성하고 위 guide 명령의 마지막 파일명만 바꿔 실행한다. 요청명은 영문·숫자·하이픈·밑줄만 쓴다. JSON에는 action과 현재 revision, 필요한 인수를 넣는다.
 
-action: guide, read(path), list(path), search(query), question(question 객체), selection(session_file/session/call/question ID), stage-review(stage/thread), spec-review(version/thread), plan(tasks), check(task), demo(thread), completion(thread), answer(thread/question/text), external-block(reason).
+action: guide, read(path), list(path), search(query), question(question 객체), selection(question ID), stage-review(stage/thread), spec-review(version/thread), plan(tasks), check(task), demo(thread), completion(thread), answer(thread/question/text), external-block(reason).
 
-확인 메뉴는 stage-review/spec-review/demo/completion이 반환한 question 객체를 실제 request_user_input으로 표시한다. 응답은 stage-selection(stage 포함)/spec-selection/demo-selection/completion-selection에 session_file/session/call을 넣어 연결한다. 미응답·수정 필요·자유 의견은 승인이 아니다. 수정 의견을 먼저 반영한다.
+확인 메뉴는 stage-review/spec-review/demo/completion이 반환한 question 객체를 실제 request_user_input으로 표시한다. 응답은 stage-selection(stage 포함)/spec-selection/demo-selection/completion-selection과 현재 revision만 전달해 연결한다. 미응답·수정 필요·자유 의견은 승인이 아니다. 수정 의견을 먼저 반영한다.
 
-CR은 docs/changes/open/CR-###.md에 사유·AS-IS/TO-BE·영향 ID를 작성한다. change-review(cr/files 전체 변경 문서 내용/version/thread)로 내용을 묶고 change-apply(session_file/session/call)로 실제 사용자 확인 후 검사·일괄 반영한다. 복구 한도·결과 미확인에서는 recovery-review(thread/reason)와 recovery-selection으로 이전 프로세스 종료·재시도 근거의 사용자 확인을 연결한다. 중단 뒤 재개는 guide가 반환한 question을 표시한 후 resume-selection으로 연결한다.
+CR은 docs/changes/open/CR-###.md에 사유·AS-IS/TO-BE·영향 ID를 작성한다. change-review(cr/files 전체 변경 문서 내용/version/thread)로 내용을 묶고 change-apply로 실제 사용자 확인 후 검사·일괄 반영한다. 복구 한도·결과 미확인에서는 recovery-review(thread/reason)와 recovery-selection으로 이전 프로세스 종료·재시도 근거의 사용자 확인을 연결한다. 중단 뒤 재개는 guide가 반환한 question을 표시한 후 resume-selection으로 연결한다.
 
 Read 도구가 없으면 read 요청으로 프로젝트 문서·코드를 읽는다. 지원하지 않는 도구를 다른 도구로 우회하지 않는다. 문서 작성·코드 수정에는 Write/Edit/apply_patch를 사용하고 셸 직접 쓰기는 하지 않는다. 필요한 제어 요청 외의 상태 DB·훅·지침을 수정하지 않는다.
 
@@ -186,7 +186,9 @@ def guide(project):
     result = {"project": str(store.project), "idea": starts[0]["idea"], "revision": snapshot["revision"],
               "goal": "합의한 결과물 구현·검증·실제 사용 후 사용자 완료 승인",
               "development_allowed": False, "complete": False, "guidance_only": True,
-              "request_help": str(Path(__file__).resolve().parents[1] / "docs/control-requests.md")}
+              "request_help": str(Path(__file__).resolve().parents[1] / "docs/control-requests.md"),
+              "selection_help": "실제 메뉴 응답은 현재 revision과 해당 selection 요청으로 연결합니다. "
+                                "제어기가 호스트 기록을 찾으므로 세션 파일과 호출 ID는 생략하세요."}
     result["harness_configured"] = (store.project / ".codex/hooks.json").is_file()
     if flow["paused"]:
         pauses = [json.loads(e["payload"]) for e in events if e["kind"] == "paused"]

@@ -92,6 +92,35 @@ class WorkspaceTests(unittest.TestCase):
         self.assertTrue(self.denied(workspace_handle(self.root, self.payload(tool_name="request_user_input",
                           tool_input={"questions": [bad]}))))
 
+    def test_hook_processes_read_utf8_menu_with_non_utf8_pipe_locale(self):
+        from build_loop.workflow import Workflow
+        from build_loop.state import StateStore
+
+        self.start()
+        project = bound_project(self.root, "session-1")
+        question = {
+            "id": "usage", "header": "사용 상황", "question": "어떤 용도인가요?",
+            "options": [{"label": "한 장 자동 저장 (Recommended)", "description": "브라우저에 저장합니다."},
+                        {"label": "임시 메모", "description": "현재 화면에서만 씁니다."}],
+        }
+        Workflow(StateStore(project, enabled=True)).ask(question, 1)
+        source = Path(__file__).resolve().parents[1]
+        shutil.copy2(source / "workspace_hook.py", self.root / "workspace_hook.py")
+        entrypoints = [
+            ([str(self.root / "workspace_hook.py")], self.root),
+            ([str(source / "hook_entry.py"), "--project", str(project)], project),
+        ]
+        for args, cwd in entrypoints:
+            with self.subTest(entrypoint=args[0]):
+                payload = self.payload(tool_name="request_user_input", tool_input={"questions": [question]})
+                payload["cwd"] = str(cwd)
+                result = subprocess.run([sys.executable, *args], cwd=cwd,
+                                        input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                        capture_output=True, timeout=10,
+                                        env=dict(os.environ, PYTHONIOENCODING="cp949", PYTHONPATH=str(source)))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {})
+
     def test_checkout_hook_command_executes_from_download_root(self):
         source = Path(__file__).resolve().parents[1]
         for name in ["workspace_hook.py", "hook_entry.py", "control.py", "launch.py", "build-loop.cmd"]:

@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 
 from build_loop.director import create_project, guide
-from build_loop.policy import decision
+from build_loop.harness import handle
+from build_loop.policy import control_command, decision
 from build_loop.state import StateStore
 from build_loop.workflow import Workflow
 
@@ -62,6 +63,48 @@ class ControlContractTests(unittest.TestCase):
     def test_saved_wrapped_question_is_normalized(self):
         view = self.control(dict(action="question", revision=1, question={"questions": [self.question]}))
         self.assertEqual(view["question"], self.question)
+
+    def test_previous_hook_record_recovers_real_selection_after_pause(self):
+        view = self.control(dict(action="question", revision=1, question=self.question))
+        self.record_selection(self.question, "first-call")
+        first_rows = self.session.read_text(encoding="utf-8").splitlines()
+        request = dict(action="selection", revision=view["revision"], question=self.question["id"])
+        self.control(request, expected=2)
+        self.assertEqual(self.store.snapshot()["revision"], view["revision"])
+
+        host = dict(cwd=str(self.project), session_id="session-1")
+        menu = dict(host, tool_name="request_user_input", tool_input={"questions": [self.question]})
+        handle(self.project, dict(menu, hook_event_name="PostToolUse", tool_use_id="first-call"))
+        paused = self.control(dict(action="external-block", revision=view["revision"], reason="older menu transport"))
+        self.control(request | {"revision": paused["revision"]}, expected=2)
+        self.assertTrue(self.store.snapshot()["paused"])
+
+        self.record_selection(paused["question"], "resume-call")
+        resume_rows = self.session.read_text(encoding="utf-8").splitlines()[1:]
+        self.session.write_text("\n".join(first_rows + resume_rows), encoding="utf-8")
+        resume = dict(host, tool_name="request_user_input", tool_input={"questions": [paused["question"]]},
+                      tool_use_id="resume-call", transcript_path=str(self.session))
+        self.assertEqual(handle(self.project, dict(resume, hook_event_name="PreToolUse")), {})
+        handle(self.project, dict(resume, hook_event_name="PostToolUse"))
+        resumed = self.control(dict(action="resume-selection", revision=paused["revision"]))
+        self.assertEqual(resumed["question"], self.question)
+        answer = self.control(request | {"revision": resumed["revision"]})
+        self.assertEqual(answer["stage"], "brief")
+        self.assertEqual(answer["accepted_answers"][self.question["id"]]["source"]["call_id"], "first-call")
+        self.control(request | {"revision": answer["revision"]}, expected=2)
+
+    def test_allowed_control_command_locates_legacy_menu_without_model_metadata(self):
+        view = self.control(dict(action="question", revision=1, question=self.question))
+        self.record_selection(self.question, "older-call")
+        host = dict(cwd=str(self.project), session_id="session-1")
+        handle(self.project, dict(host, hook_event_name="PostToolUse", tool_use_id="older-call",
+                                  tool_name="request_user_input", tool_input={"questions": [self.question]}))
+        payload = dict(host, hook_event_name="PreToolUse", tool_name="Bash",
+                       tool_input={"command": control_command(self.project, "test-contract.json")},
+                       transcript_path=str(self.session))
+        self.assertEqual(handle(self.project, payload), {})
+        confirmed = self.control(dict(action="selection", revision=view["revision"], question=self.question["id"]))
+        self.assertEqual(confirmed["accepted_answers"][self.question["id"]]["text"], self.question["options"][0]["label"])
 
     def test_bad_shape_reports_contract_without_changing_revision(self):
         result = self.control(dict(action="question", revision=1, question=dict(self.question, text="wrong")), expected=2)

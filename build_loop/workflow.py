@@ -127,7 +127,8 @@ class Workflow:
             q["options"] = [{"label": normalized(o["label"]), "description": normalized(o["description"])}
                             for o in options]
             labels = [o["label"] for o in q["options"]]
-            if len(set(labels)) != len(labels) or "추천" not in labels[0]:
+            recommended = "추천" in labels[0] or labels[0].endswith(" (Recommended)")
+            if len(set(labels)) != len(labels) or not recommended:
                 raise StateError("첫 선택지에 추천 표시가 있어야 하고 선택지는 중복될 수 없습니다.")
             return q
         return self._change(revision, "interview_question", build)

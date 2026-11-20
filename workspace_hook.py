@@ -8,7 +8,8 @@ from build_loop.workspace import workspace_handle
 
 payload = {}
 try:
-    payload = json.load(sys.stdin)
+    # Codex sends UTF-8 even when Windows gives Python a different pipe encoding.
+    payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     result = workspace_handle(Path(__file__).resolve().parent, payload)
 except Exception:
     event = payload.get("hook_event_name") if isinstance(payload, dict) else None

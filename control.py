@@ -11,31 +11,51 @@ from build_loop.workflow import Workflow
 from build_loop.delivery import Delivery
 from build_loop.rpc import ReadOnlyCodex, RpcError
 from build_loop.menu_input import question_matches
+from build_loop.selection import find_selection, read_selection
 import subprocess
 import sys
 
 
-def selection_operation(store, data, operation):
+def selection_request(store, data):
+    action = data["action"]
+    snapshot = store.snapshot()
+    if action == "selection":
+        pending = Workflow.fold(snapshot)["pending_question"]
+        if not pending or pending["id"] != data.get("question"):
+            raise StateError("현재 미응답 질문 ID를 확인하세요.")
+        return {"question": pending}, None
+    mapping = {"stage-selection": ("stage_review_requested", data.get("stage"), "stage"),
+               "spec-selection": ("spec_review_requested", "spec", None),
+               "demo-selection": ("delivery_confirmation_requested", "demo", "kind"),
+               "completion-selection": ("delivery_confirmation_requested", "completion", "kind"),
+               "change-apply": ("change_review_requested", "change", None),
+               "recovery-selection": ("recovery_review_requested", "recovery", None),
+               "resume-selection": ("paused", "resume", None)}
+    kind, target, field = mapping[action]
+    requests = [json.loads(e["payload"]) for e in snapshot["events"] if e["kind"] == kind]
+    if field == "stage":
+        requests = [request for request in requests if request.get(field) == target]
+    if (not requests or not requests[-1].get("question")
+            or (field == "kind" and requests[-1].get(field) != target)):
+        raise StateError("현재 요청에 연결된 선택 메뉴가 없습니다.")
+    return requests[-1], target
+
+
+def selection_source(store, data, request):
+    fields = {"session_file", "session", "call"}
+    if not fields.intersection(data):
+        return find_selection(store.project, request["question"], request.get("thread_id"))
+    if not fields.issubset(data):
+        raise StateError("기존 형식의 세션·호출 필드는 모두 제공하거나 모두 생략하세요.")
+    return Path(data["session_file"]), data["session"], data["call"]
+
+
+def selection_operation(store, data, request, target, selection, operation):
     try:
         return operation()
     except StateError:
-        from build_loop.selection import read_selection
-        action = data["action"]
-        mapping = {"stage-selection": ("stage_review_requested", data.get("stage")),
-                   "spec-selection": ("spec_review_requested", "spec"),
-                   "demo-selection": ("delivery_confirmation_requested", "demo"),
-                   "completion-selection": ("delivery_confirmation_requested", "completion"),
-                   "change-apply": ("change_review_requested", "change"),
-                   "recovery-selection": ("recovery_review_requested", "recovery")}
-        kind, target = mapping[action]
-        requests = [json.loads(e["payload"]) for e in store.snapshot()["events"] if e["kind"] == kind]
-        if kind == "stage_review_requested":
-            requests = [r for r in requests if r["stage"] == target]
-        if not requests:
-            raise
-        request = requests[-1]
-        receipt, question, answer = read_selection(Path(data["session_file"]), data["session"], data["call"], request["question"]["id"])
-        if not question_matches(request["question"], question) or data["session"] != request.get("thread_id") or answer == question["options"][0]["label"]:
+        receipt, question, answer = read_selection(*selection, request["question"]["id"])
+        if not question_matches(request["question"], question) or selection[1] != request.get("thread_id") or answer == question["options"][0]["label"]:
             raise
         with store._write(data["revision"]) as (db, state):
             return store._event(db, state, "review_feedback", {"target": target, "question_id": question["id"],
@@ -87,8 +107,6 @@ def execute(project, request):
         return {"matches": matches, "truncated": False}
     if action == "question":
         flow.ask(data["question"], revision)
-    elif action == "selection":
-        flow.capture_selection(Path(data["session_file"]), data["session"], data["call"], data["question"], revision)
     elif action == "stage-review":
         return request_stage_review(store, data["stage"], data["thread"], revision)
     elif action == "spec-review":
@@ -97,18 +115,14 @@ def execute(project, request):
         flow.review("spec-set", data["version"], list(result["files"]), revision, data["thread"])
     elif action == "plan":
         delivery.plan(data["tasks"], revision)
-    elif action in {"change-review", "change-apply"}:
+    elif action == "change-review":
         from build_loop.changes import Changes
         changes = Changes(store)
-        if action == "change-review":
-            return changes.request(data["cr"], data["files"], data["version"], data["thread"], revision)
-        selection_operation(store, data, lambda: changes.apply(Path(data["session_file"]), data["session"], data["call"], revision))
+        return changes.request(data["cr"], data["files"], data["version"], data["thread"], revision)
     elif action == "check":
         delivery.run_check(data["task"], revision)
     elif action == "recovery-review":
         return delivery.request_recovery(data["thread"], data["reason"], revision)
-    elif action == "recovery-selection":
-        selection_operation(store, data, lambda: delivery.authorize_recovery(Path(data["session_file"]), data["session"], data["call"], revision))
     elif action in {"demo", "completion"}:
         return delivery.request_user_confirmation(action, data["thread"], revision)
     elif action == "external-block":
@@ -116,16 +130,28 @@ def execute(project, request):
         if not isinstance(reason, str) or not reason.strip():
             raise StateError("외부 차단 근거가 필요합니다.")
         store.pause(revision, "external_block: " + reason)
-    elif action == "resume-selection":
-        store.resume_selection(Path(data["session_file"]), data["session"], data["call"], revision)
-    elif action in {"stage-selection", "spec-selection", "demo-selection", "completion-selection"}:
-        selection = (Path(data["session_file"]), data["session"], data["call"])
+    elif action in {"selection", "resume-selection", "stage-selection", "spec-selection",
+                    "demo-selection", "completion-selection", "change-apply", "recovery-selection"}:
+        selection_data, target = selection_request(store, data)
+        selection = selection_source(store, data, selection_data)
+        if action == "selection":
+            flow.capture_selection(*selection, data["question"], revision)
+            return guide(root)
+        if action == "resume-selection":
+            store.resume_selection(*selection, revision)
+            return guide(root)
         if action == "stage-selection":
-            selection_operation(store, data, lambda: confirm_stage(store, None, data["stage"], revision, selection))
+            operation = lambda: confirm_stage(store, None, data["stage"], revision, selection)
         elif action == "spec-selection":
-            selection_operation(store, data, lambda: flow.observe_approval(None, data["session"], revision, selection))
+            operation = lambda: flow.observe_approval(None, selection[1], revision, selection)
+        elif action == "change-apply":
+            from build_loop.changes import Changes
+            operation = lambda: Changes(store).apply(*selection, revision)
+        elif action == "recovery-selection":
+            operation = lambda: delivery.authorize_recovery(*selection, revision)
         else:
-            selection_operation(store, data, lambda: delivery.confirm_user(None, action.split("-")[0], revision, selection))
+            operation = lambda: delivery.confirm_user(None, target, revision, selection)
+        selection_operation(store, data, selection_data, target, selection, operation)
     elif action in {"stage-confirm", "spec-confirm", "demo-confirm", "completion-confirm", "answer"}:
         executable = shutil.which("codex.exe")
         if not executable:

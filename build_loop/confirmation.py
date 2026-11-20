@@ -1,5 +1,8 @@
 """확인할 대상과 버전을 실제 동기 선택 질문에 묶는다."""
 
+import hashlib
+import json
+
 from .selection import read_selection
 from .state import StateError
 from .menu_input import question_matches
@@ -21,4 +24,7 @@ def selected(request, path, session, call):
         raise StateError("확인을 요청한 스레드와 응답 세션이 다릅니다.")
     if not question_matches(expected, actual) or answer != expected["options"][0]["label"]:
         raise StateError("해당 대상·버전을 확인한 응답이 없습니다. 수정 의견 또는 미응답 상태를 보존합니다.")
+    receipt["question_sha256"] = hashlib.sha256(
+        json.dumps(expected, ensure_ascii=False, sort_keys=True).encode()
+    ).hexdigest()
     return receipt
