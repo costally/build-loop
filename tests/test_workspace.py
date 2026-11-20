@@ -126,7 +126,7 @@ class WorkspaceTests(unittest.TestCase):
                              capture_output=True, text=True, timeout=10)
         self.assertEqual(json.loads(pre.stdout), {})
         checked = subprocess.run([sys.executable, "control.py", "--project", str(project),
-                                  "--request", "guide.json"], cwd=self.root, capture_output=True, text=True, timeout=10)
+                                  "--request", "guide.json"], cwd=self.root, capture_output=True, text=True, encoding="utf-8", timeout=10)
         self.assertEqual(checked.returncode, 0, checked.stderr)
         self.assertEqual(json.loads(checked.stdout)["stage"], "brief")
 

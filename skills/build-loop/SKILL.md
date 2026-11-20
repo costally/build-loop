@@ -5,6 +5,8 @@ description: 아이디어를 인터뷰·승인 스펙·개발·검증·실제 �
 
 # build-loop 관리 프로젝트 진행
 
+guide 응답의 request_help에 제어 요청 계약이 있다. Read가 없으면 `Get-Content -LiteralPath "<request_help 전체 경로>" -Encoding UTF8`로 읽는다. 질문은 `{action:"question",revision,question:{id,header,question,options}}`로 등록한다. header는 12자 이하이며 options 첫 항목에 추천·이유를 넣는다. 등록 성공 응답의 question을 같은 턴에서 실제 request_user_input으로 표시한다. 질문 등록 같은 입력 검증 오류는 구현 검증 실패가 아니므로 기획 중 recovery-review를 요청하지 않는다. 오류 응답의 예제와 계약으로 수정하고, paused이면 guide의 재개 메뉴와 resume-selection을 먼저 처리한다.
+
 사용자가 시작·다음·계속을 요청하면 프로젝트 AGENTS.md의 guide 명령을 실행한다. 현재 미완료 작업 하나를 처리하고 같은 guide로 돌아온다. 사용자의 목표 결과물을 만들며 도구 자체 진단으로 가지치지 않는다.
 
 ## 인터뷰

@@ -117,7 +117,7 @@ def workspace_handle(root, payload):
         mapped["tool_input"] = {"edits": [{"file_path": str((cwd / name).resolve())} for name in paths]}
     if event == "PreToolUse" and command:
         # Read 도구가 없는 호스트에서도 지침 두 파일만 셸로 읽을 수 있다.
-        for path in [project / "AGENTS.md", root / "skills/build-loop/SKILL.md"]:
+        for path in [project / "AGENTS.md", root / "skills/build-loop/SKILL.md", root / "docs/control-requests.md"]:
             expected = f'Get-Content -LiteralPath "{path}" -Encoding UTF8'
             if command == expected:
                 return {}

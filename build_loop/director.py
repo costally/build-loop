@@ -139,6 +139,8 @@ def create_project(root, name, idea, template_root, *, enabled=False):
 
 ## 진행 상태를 실제로 연결하는 방법
 
+- 제어 요청의 정확한 인수는 guide의 request_help 파일에 있다. Read가 없으면 `Get-Content -LiteralPath "<request_help 전체 경로>" -Encoding UTF8`로 읽는다. question 객체의 필수 필드는 id/question/options, 선택 필드는 header(12자 이하)다. 입력 형식 오류를 구현 실패 복구 횟수와 혼동하지 않는다. 기획 중에는 recovery-review를 호출하지 않는다.
+
 - 질문을 표시하기 전에 workflow ask로 질문 ID·문구·선택지를 저장한다. 출력한 질문과 저장한 질문을 동일하게 유지한다.
 - 동기 메뉴 응답은 workflow capture-selection의 session-file/session/call/question으로 대조·저장한다. 일반 메시지는 workflow answer로 지정 스레드에서 실제 응답을 읽는다. 선택을 받지 못하면 저장하지 않는다.
 - guide의 action_kind=draft이면 담당 스킬로 해당 산출물을 작성한다. action_kind=review이면 문서를 먼저 보여주고 stage-review로 대상 파일·스레드를 연결한다. 사용자의 실제 확인 응답을 stage-confirm으로 읽은 뒤 guide를 다시 실행한다.
@@ -183,7 +185,8 @@ def guide(project):
     reviews, confirmations = stage_records(snapshot)
     result = {"project": str(store.project), "idea": starts[0]["idea"], "revision": snapshot["revision"],
               "goal": "합의한 결과물 구현·검증·실제 사용 후 사용자 완료 승인",
-              "development_allowed": False, "complete": False, "guidance_only": True}
+              "development_allowed": False, "complete": False, "guidance_only": True,
+              "request_help": str(Path(__file__).resolve().parents[1] / "docs/control-requests.md")}
     result["harness_configured"] = (store.project / ".codex/hooks.json").is_file()
     if flow["paused"]:
         pauses = [json.loads(e["payload"]) for e in events if e["kind"] == "paused"]

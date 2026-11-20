@@ -102,12 +102,26 @@ class Workflow:
         def build(view):
             if view["pending_question"]:
                 raise StateError("현재 미완료 질문 또는 스펙 검토를 먼저 처리해야 합니다.")
-            if set(question) != {"id", "question", "options"}:
-                raise StateError("질문 형식이 올바르지 않습니다.")
-            q = {"id": normalized(question["id"]), "question": normalized(question["question"])}
+            if isinstance(question, dict) and set(question) == {"questions"}:
+                wrapped = question["questions"]
+                if isinstance(wrapped, list) and len(wrapped) == 1:
+                    question_value = wrapped[0]
+                else:
+                    raise StateError("한 번에 질문 하나만 등록하세요: question={id,header,question,options}.")
+            else:
+                question_value = question
+            if (not isinstance(question_value, dict)
+                    or not {"id", "question", "options"} <= set(question_value)
+                    or set(question_value) - {"id", "header", "question", "options"}):
+                raise StateError('질문 형식: question={"id":"use_case","header":"사용 상황","question":"질문 문장","options":[{"label":"첫 선택 (추천)","description":"이유"},{"label":"둘째 선택","description":"설명"}]}. text 필드는 사용하지 않습니다.')
+            q = {"id": normalized(question_value["id"]), "question": normalized(question_value["question"])}
+            if "header" in question_value:
+                q["header"] = normalized(question_value["header"])
+                if len(q["header"]) > 12:
+                    raise StateError("질문 header는 12자 이하입니다.")
             if any(old["id"] == q["id"] for old in view["questions"]):
                 raise StateError("이미 사용한 질문 ID입니다.")
-            options = question["options"]
+            options = question_value["options"]
             if not isinstance(options, list) or not 2 <= len(options) <= 3:
                 raise StateError("선택지는 2~3개여야 합니다.")
             q["options"] = [{"label": normalized(o["label"]), "description": normalized(o["description"])}
@@ -175,7 +189,7 @@ class Workflow:
             pending = view["pending_question"]
             if not pending or pending["id"] != question_id:
                 raise StateError("현재 미응답 질문과 다릅니다.")
-            actual = {k: question.get(k) for k in ["id", "question", "options"]}
+            actual = {k: question.get(k) for k in pending}
             if actual != pending:
                 raise StateError("표시한 질문·선택지가 저장된 질문과 다릅니다.")
             if any(a["source"].get("session_id") == session_id and a["source"].get("call_id") == call_id

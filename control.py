@@ -11,6 +11,7 @@ from build_loop.workflow import Workflow
 from build_loop.delivery import Delivery
 from build_loop.rpc import ReadOnlyCodex, RpcError
 import subprocess
+import sys
 
 
 def selection_operation(store, data, operation):
@@ -150,12 +151,20 @@ def execute(project, request):
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
     parser.add_argument("--request", required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(execute(args.project, args.request), ensure_ascii=True, indent=2))
+        print(json.dumps(execute(args.project, args.request), ensure_ascii=False, indent=2))
     except (StateError, RpcError, ValueError, OSError, KeyError, subprocess.SubprocessError) as error:
-        print(json.dumps({"blocked": True, "error": str(error)}, ensure_ascii=True))
+        print(json.dumps({"blocked": True, "error": str(error),
+                          "request_help": str(Path(__file__).resolve().parent / "docs/control-requests.md"),
+                          "next_action": "요청 형식 오류는 위 계약으로 수정하세요. 구현 작업이 없으면 recovery-review를 호출하지 마세요. paused이면 guide의 재개 메뉴부터 처리하세요.",
+                          "question_example": {"action": "question", "revision": "현재 guide의 revision",
+                            "question": {"id": "use_case", "header": "사용 상황", "question": "어떤 용도인가요?",
+                              "options": [{"label": "개인 메모 (추천)", "description": "최소 사용 흐름"},
+                                          {"label": "여러 메모", "description": "목록 관리"}]}}}, ensure_ascii=False))
         raise SystemExit(2)

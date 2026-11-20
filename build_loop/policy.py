@@ -60,6 +60,14 @@ def decision(project, payload=None):
         store = StateStore(root)
         flow = Workflow(store).status()
         if flow["paused"]:
+            # 재개 응답을 제어기에 전달할 요청 파일은 중단 상태에서도 작성해야 한다.
+            # 상태 변경 권한은 제어기의 실제 사용자 응답 검증이 담당한다.
+            paths = write_paths(payload) if tool in {"Write", "Edit", "MultiEdit", "apply_patch"} else []
+            if paths and all((root / name).resolve().is_relative_to(root)
+                             and re.fullmatch(r"\.build-loop/requests/[A-Za-z0-9_-]+\.json",
+                                              (root / name).resolve().relative_to(root).as_posix())
+                             for name in paths):
+                return {}
             if tool == "request_user_input":
                 from .director import guide
                 question = guide(root).get("question")
