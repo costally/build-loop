@@ -6,6 +6,8 @@
 
 ## 시작
 
+처음 사용하는 분은 **[처음 사용하기 — 다운로드부터 카운터 예제 완성까지](docs/getting-started.md)**를 따라가세요. ZIP 다운로드, PowerShell 실행, Codex에서 프로젝트 열기, 승인과 재개 방법을 안내합니다.
+
 Windows에서 Python 3.13 이상, Git, Codex가 필요합니다. 추가 Python 패키지는 없습니다.
 
 ```powershell
