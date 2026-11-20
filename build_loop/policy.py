@@ -37,7 +37,9 @@ def write_paths(payload):
         edits = data.get("edits")
         if isinstance(edits, list):
             return [edit.get("file_path", "") for edit in edits if isinstance(edit, dict)]
-        patch = data.get("patch", data.get("input", ""))
+        # Codex의 네이티브 훅은 apply_patch 원문을 command 필드로 전달한다.
+        # patch/input은 직접 도구 호출과 기존 통합 경로의 호환 형식이다.
+        patch = data.get("command", data.get("patch", data.get("input", "")))
     else:
         return []
     return re.findall(r"^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$", patch, re.M) if isinstance(patch, str) else []

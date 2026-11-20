@@ -97,6 +97,13 @@ class WorkspaceTests(unittest.TestCase):
         for name in ["workspace_hook.py", "hook_entry.py", "control.py", "launch.py", "build-loop.cmd"]:
             shutil.copyfile(source / name, self.root / name)
         shutil.copytree(source / "build_loop", self.root / "build_loop", ignore=shutil.ignore_patterns("__pycache__"))
+        # 네이티브 Codex는 patch/input이 아니라 tool_input.command로 패치를 보낸다.
+        request = self.root / ".build-loop/start-session-1.json"
+        patch = f'*** Begin Patch\n*** Add File: {request}\n+{{"name":"web-notepad","idea":"메모장"}}\n*** End Patch'
+        before = subprocess.run([sys.executable, "workspace_hook.py"], cwd=self.root,
+                                input=json.dumps(self.payload(tool_name="apply_patch", tool_input={"command": patch})),
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(json.loads(before.stdout), {})
         # 배포한 폴더의 실제 런처로 생성하고 그 폴더의 훅/제어기를 실행한다.
         (self.root / ".build-loop/start-session-1.json").write_text(
             json.dumps({"name": "web-notepad", "idea": "웹페이지 메모장"}), encoding="utf-8")
@@ -130,3 +137,18 @@ class WorkspaceTests(unittest.TestCase):
         with self.assertRaises(StateError):
             begin(self.root, "session-1")
         self.assertFalse((self.root / "projects").exists())
+
+    def test_native_command_patch_bootstrap_and_project_writes(self):
+        request = self.root / ".build-loop/start-session-1.json"
+        patch = f'*** Begin Patch\n*** Add File: {request}\n+{{"name":"web-notepad","idea":"메모장"}}\n*** End Patch'
+        payload = self.payload(tool_name="apply_patch", tool_input={"command": patch})
+        self.assertEqual(workspace_handle(self.root, payload), {})
+        other = patch.replace("start-session-1.json", "start-other-session.json")
+        self.assertTrue(self.denied(workspace_handle(self.root, self.payload(tool_name="apply_patch", tool_input={"command": other}))))
+        self.start()
+        project = bound_project(self.root, "session-1")
+        for path, allowed in [(project / "docs/00-brief.md", True), (project / "code/index.html", False),
+                              (self.root / "README.md", False)]:
+            patch = f'*** Begin Patch\n*** Add File: {path}\n+content\n*** End Patch'
+            result = workspace_handle(self.root, self.payload(tool_name="apply_patch", tool_input={"command": patch}))
+            self.assertEqual(not self.denied(result), allowed)

@@ -43,6 +43,17 @@ class HarnessTests(unittest.TestCase):
         result = decision(self.project, self.payload(tool="apply_patch", data={"input": patch}))
         self.assertEqual(result["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_native_command_patch_respects_stage_and_checks_python_after_write(self):
+        patch = "*** Begin Patch\n*** Add File: docs/00-brief.md\n+brief\n*** End Patch"
+        self.assertEqual(decision(self.project, self.payload(tool="apply_patch", data={"command": patch})), {})
+        hidden = patch.replace("*** End Patch", "*** Add File: code/hidden.py\n+pass\n*** End Patch")
+        self.assertEqual(decision(self.project, self.payload(tool="apply_patch", data={"command": hidden}))[
+            "hookSpecificOutput"]["permissionDecision"], "deny")
+        (self.project / "code/broken.py").write_text("def broken(:", encoding="utf-8")
+        result = handle(self.project, self.payload(event="PostToolUse", tool="apply_patch", data={
+            "command": "*** Begin Patch\n*** Add File: code/broken.py\n+def broken(:\n*** End Patch"}))
+        self.assertEqual(result["decision"], "block")
+
     def test_control_command_allowed_but_appended_shell_blocked(self):
         command = control_command(self.project, "guide.json")
         self.assertEqual(decision(self.project, self.payload(tool="Bash", data={"command": command})), {})

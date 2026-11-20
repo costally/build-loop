@@ -105,7 +105,8 @@ def workspace_handle(root, payload):
                 return {}
             if tool in {"Read", "Glob", "Grep"}:
                 return {}
-            return deny(context)
+            return deny(f"시작 단계에서 허용되지 않은 호출: {tool}. "
+                        "요청 파일은 apply_patch로 작성하고 begin을 별도 호출하세요.\n" + context)
         # 아이디어를 아직 받지 않은 세션을 자동 계속시키지 않는다.
         return {}
     # 루트 작업 디렉터리에서 상대 경로를 쓰더라도 프로젝트 경계는 동일하게 검사한다.
