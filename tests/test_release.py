@@ -22,6 +22,9 @@ class ReleaseTests(unittest.TestCase):
             view = json.loads(started.stdout.decode("utf-8"))
             self.assertEqual(view["stage"], "brief")
             self.assertFalse(view["development_allowed"])
+            self.assertIn("default_mode_request_user_input = true",
+                          (root / "projects/example/.codex/config.toml").read_text(encoding="utf-8"))
+            self.assertTrue((root / "projects/example/.agents/skills/build-loop/SKILL.md").is_file())
             marker = root / "projects/example/code/keep.txt"
             marker.write_text("preserve", encoding="utf-8")
             again = subprocess.run(command, capture_output=True, timeout=30)

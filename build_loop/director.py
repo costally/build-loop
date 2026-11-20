@@ -96,6 +96,9 @@ def create_project(root, name, idea, template_root, *, enabled=False):
     destination.mkdir()
     (destination / "docs").mkdir()
     (destination / "code").mkdir()
+    (destination / ".codex").mkdir()
+    (destination / ".codex/config.toml").write_text(
+        "[features]\ndefault_mode_request_user_input = true\n", encoding="utf-8")
     store = StateStore(destination, enabled=True)
     store.initialize()
     local_templates = destination / ".build-loop" / "templates"
