@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCR-002 어떤 프로젝트를 이어갈까요? — 와이어프레임</title>
+<style>
+  /* ===== 와이어프레임 공통 스타일 (로파이 그레이스케일 — 수정하지 말고 그대로 사용) ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: #e8e8e8; color: #333; padding: 24px; }
+  .wf-meta { max-width: 1000px; margin: 0 auto 16px; font-size: 13px; color: #666;
+             background: #fffbe6; border: 1px solid #e6d996; padding: 10px 14px; border-radius: 4px; }
+  .wf-meta strong { color: #333; }
+  .screen { max-width: 1000px; margin: 0 auto; background: #fff; border: 2px solid #555; min-height: 600px; }
+
+  /* 박스형 요소 */
+  .wf-box { border: 1px dashed #999; background: #fafafa; padding: 16px; margin: 12px; position: relative; }
+  .wf-box.solid { border-style: solid; }
+
+  /* 주석 번호 배지 — 화면정의서의 구성요소 번호 [n]와 일치시킬 것 */
+  .n { display: inline-flex; align-items: center; justify-content: center;
+       width: 20px; height: 20px; border-radius: 50%; background: #d33; color: #fff;
+       font-size: 12px; font-weight: bold; position: absolute; top: -10px; left: -10px; }
+
+  /* 자리표시자 요소 */
+  .wf-img { background: repeating-linear-gradient(45deg, #eee, #eee 8px, #f7f7f7 8px, #f7f7f7 16px);
+            border: 1px solid #bbb; display: flex; align-items: center; justify-content: center;
+            color: #999; font-size: 12px; min-height: 120px; }
+  .wf-btn { display: inline-block; border: 1px solid #666; background: #ddd; padding: 8px 20px;
+            font-size: 14px; cursor: default; border-radius: 3px; }
+  .wf-btn.primary { background: #888; color: #fff; }
+  .wf-input { border: 1px solid #999; background: #fff; padding: 8px 10px; font-size: 14px;
+              width: 100%; color: #aaa; border-radius: 3px; }
+  .wf-text { color: #555; font-size: 14px; line-height: 1.6; }
+  .wf-text.title { font-size: 20px; font-weight: bold; color: #222; }
+  .wf-text.placeholder { background: #eee; color: transparent; border-radius: 2px; user-select: none; }
+  .wf-nav { display: flex; align-items: center; gap: 16px; padding: 12px 16px;
+            border-bottom: 2px solid #555; background: #f0f0f0; }
+  .wf-nav .logo { font-weight: bold; border: 1px solid #999; padding: 4px 10px; background: #fff; }
+  .wf-nav .spacer { flex: 1; }
+  .row { display: flex; gap: 12px; margin: 12px; }
+  .row > * { margin: 0; }
+  .col-main { flex: 2; } .col-side { flex: 1; }
+  .wf-footer { border-top: 2px solid #555; background: #f0f0f0; padding: 16px; text-align: center;
+               color: #999; font-size: 12px; }
+</style>
+<style>
+.wf-meta,.n{background:#eee;color:#333;border-color:#888}.n{background:#555;color:white} .wf-btn{cursor:pointer;color:#222;text-decoration:none} .tools{max-width:1000px;margin:0 auto 20px;display:flex;gap:12px;flex-wrap:wrap} .tools select,.tools button{padding:8px} .wf-box{margin:24px;line-height:1.8}.wf-box h2{font-size:18px}.wf-box p{white-space:pre-line} .state{padding:24px;border:2px dashed #777;margin:24px} .choices label{display:block;padding:10px;border:1px solid #aaa;margin:8px 0}.choices textarea{width:100%;padding:10px;font:inherit}button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #333;outline-offset:3px} .feedback{padding:12px;background:#eee} @media(max-width:600px){body{padding:12px}.wf-box{margin:20px 12px}}
+</style></head>
+<body><div class="wf-meta"><strong>SCR-002 어떤 프로젝트를 이어갈까요?</strong> · v1.2 · 승인 · REQ-002, REQ-004 · POL-002, POL-004, POL-009<br>대화 흐름 검토용 목업 / 실제 제품 동작·시험 결과 아님<br>관련 테스트: TC-002, TC-004, TC-011, TC-013, TC-018, TC-020, TC-030, TC-031, TC-037, TC-038, TC-041 · CR-001</div><nav class="tools"><a href="index.html">전체 화면</a><label>표현 <select id="surface"><option>Codex 앱</option><option>Codex CLI</option></select></label><label>상태 <select id="state"><option value="default">기본</option><option value="loading">로딩</option><option value="empty">빈 상태</option><option value="error">에러</option></select></label></nav><main class="screen"><p id="surface-label" class="wf-box">Codex 앱 대화 표현 예시</p><div id="status" class="state" hidden></div><div id="content"><section class="wf-box" data-component="1"><span class="n">1</span><h2>현재 작업 위치</h2><p>C:/build-loop/projects · 프로젝트 목록 예시</p></section><section class="wf-box" data-component="2"><span class="n">2</span><h2>프로젝트 목록</h2><p>예시 프로젝트: idea-demo · 마지막 단계: 인터뷰 · 미응답 질문 1개</p></section><section class="wf-box" data-component="3"><span class="n">3</span><h2>새 프로젝트</h2><p>영문 프로젝트명으로 docs/와 code/를 구성합니다. 이름·경로 충돌 시 기존 파일을 보존합니다.</p></section><section class="wf-box" data-component="4"><span class="n">4</span><h2>재개 미리보기</h2><p>확정 결정·현재 단계·첫 미완료 작업을 확인합니다. 저장 상태와 실제 파일이 다르면 먼저 차이를 표시합니다. 동일 DB의 revision과 실제 파일을 대조합니다. 낡은 revision은 거절하며 잠금 대기는 최대 5초입니다.</p></section><section class="wf-box" data-component="5"><span class="n">5</span><h2>다음 작업</h2><p>예시 프로젝트 선택 → 인터뷰</p><button id="primary" class="wf-btn primary">예시 프로젝트 선택</button><p id="feedback" role="status" class="feedback" hidden></p></section></div></main><script>
+const cfg={"id": "SCR-002", "loading": "프로젝트 상태를 불러오고 있습니다.", "empty": "아직 프로젝트가 없습니다. 새 프로젝트로 시작해 주세요.", "error": "저장 상태와 실제 파일이 다릅니다. 확인이 필요한 항목을 표시했습니다.", "target": "SCR-003-선택형인터뷰.html"};
+const state=document.querySelector('#state'),content=document.querySelector('#content'),statusBox=document.querySelector('#status'),primary=document.querySelector('#primary'),feedback=document.querySelector('#feedback');
+state.addEventListener('change',()=>{const normal=state.value==='default';content.hidden=!normal;statusBox.hidden=normal;statusBox.textContent=normal?'':cfg[state.value];primary.disabled=!normal;});
+document.querySelector('#surface').addEventListener('change',e=>{document.querySelector('#surface-label').textContent=e.target.value+' 대화 표현 예시';});
+primary.addEventListener('click',()=>{
+ if(cfg.id==='SCR-003'){
+  const a=document.querySelector('input[name="answer"]:checked'),free=document.querySelector('#free-answer').value.trim();
+  feedback.hidden=false;
+  if(!a&&!free){feedback.textContent='선택하거나 의견을 입력해 주세요. 아직 답변은 확정되지 않았습니다.';return;}
+  feedback.textContent='예시 답변: '+(free||(a&&a.value))+'. 실제 답변은 저장하지 않았습니다. ';
+  const link=document.createElement('a');link.href=cfg.target;link.textContent='인터뷰 종료 후 스펙 검토 예시 보기';feedback.append(link);return;
+ }
+ if(cfg.id==='SCR-007'){feedback.hidden=false;feedback.textContent='목업의 완료 승인 예시입니다. 실제 프로젝트의 완료·승인 기록은 변경되지 않았습니다.';return;}
+ window.location.href=cfg.target;
+});
+</script><!-- 변경 이력: v1.1 | 2026-11-20 | TC 메타·버전 연결, 동작 유지 | CR-001 -->
+<!-- 변경 이력: v1.2 | 2026-11-20 | 상태·오류·승인 근거 안내 및 TC 연결 | CR-004 -->
+</body></html>
