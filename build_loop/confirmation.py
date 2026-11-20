@@ -2,6 +2,7 @@
 
 from .selection import read_selection
 from .state import StateError
+from .menu_input import question_matches
 
 
 def question(target, version, nonce):
@@ -18,6 +19,6 @@ def selected(request, path, session, call):
     receipt, actual, answer = read_selection(path, session, call, expected["id"])
     if request.get("thread_id") and session != request["thread_id"]:
         raise StateError("확인을 요청한 스레드와 응답 세션이 다릅니다.")
-    if actual != expected or answer != expected["options"][0]["label"]:
+    if not question_matches(expected, actual) or answer != expected["options"][0]["label"]:
         raise StateError("해당 대상·버전을 확인한 응답이 없습니다. 수정 의견 또는 미응답 상태를 보존합니다.")
     return receipt

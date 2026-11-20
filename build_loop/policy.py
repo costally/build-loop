@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .state import StateStore, StateError
 from .workflow import Workflow
+from .menu_input import menu_tool_name, menu_arguments, question_matches
 
 
 def deny(reason):
@@ -49,8 +50,10 @@ def decision(project, payload=None):
     root = Path(project).resolve(strict=True)
     if not payload:
         return deny("현재 호출을 확인할 수 없습니다.")
-    tool = str(payload.get("tool_name", "")).split(".")[-1]
+    tool = menu_tool_name(payload.get("tool_name", ""))
     data = payload.get("tool_input", {})
+    if tool == "request_user_input":
+        data = menu_arguments(data)
     if tool in {"Read", "Glob", "Grep"}:
         return {}
     if tool in {"Bash", "exec_command"}:
@@ -71,9 +74,16 @@ def decision(project, payload=None):
             if tool == "request_user_input":
                 from .director import guide
                 question = guide(root).get("question")
-                if question and data.get("questions") == [question]:
+                questions = data.get("questions", [])
+                if question and isinstance(questions, list) and len(questions) == 1 and question_matches(question, questions[0]):
                     return {}
-            return deny("사용자가 중단했습니다. 저장된 상태를 유지합니다.")
+                return deny("재개 메뉴 입력이 저장된 재개 질문과 일치하지 않습니다. "
+                            f"tool={payload.get('tool_name')}; input_keys={sorted(data)}; "
+                            f"question_keys={sorted(questions[0]) if isinstance(questions, list) and questions and isinstance(questions[0], dict) else []}. "
+                            "guide의 question을 수정 없이 questions:[question]으로 전달하세요.")
+            return deny("중단 상태에서 허용되지 않은 도구입니다. "
+                        f"tool={payload.get('tool_name')}; "
+                        "guide 조회와 재개 메뉴, 제어 요청 파일 작성만 허용됩니다.")
         if tool == "request_user_input":
             pending = flow["pending_question"]
             if not pending:
@@ -93,7 +103,7 @@ def decision(project, payload=None):
                         if last["code"] == Delivery(store).code_version():
                             pending = last.get("question")
             questions = data.get("questions", []) if isinstance(data, dict) else []
-            if not pending or len(questions) != 1 or {k: questions[0].get(k) for k in pending} != pending:
+            if not pending or not isinstance(questions, list) or len(questions) != 1 or not question_matches(pending, questions[0]):
                 return deny("저장된 현재 질문·선택지와 일치하는 동기 메뉴만 표시할 수 있습니다.")
             return {}
         if tool not in {"Write", "Edit", "MultiEdit", "apply_patch"}:

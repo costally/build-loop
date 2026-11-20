@@ -189,8 +189,8 @@ class Workflow:
             pending = view["pending_question"]
             if not pending or pending["id"] != question_id:
                 raise StateError("현재 미응답 질문과 다릅니다.")
-            actual = {k: question.get(k) for k in pending}
-            if actual != pending:
+            from .menu_input import question_matches
+            if not question_matches(pending, question):
                 raise StateError("표시한 질문·선택지가 저장된 질문과 다릅니다.")
             if any(a["source"].get("session_id") == session_id and a["source"].get("call_id") == call_id
                    for a in view["answers"].values()):

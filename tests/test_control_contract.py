@@ -38,6 +38,7 @@ class ControlContractTests(unittest.TestCase):
         return json.loads(run.stdout)
 
     def record_selection(self, question, call):
+        question = dict(question, isOther=True, isSecret=False)
         rows = [{"type": "session_meta", "payload": {"id": "session-1"}},
                 {"type": "turn_context", "payload": {"turn_id": "turn-1"}},
                 {"type": "response_item", "payload": {"type": "function_call", "call_id": call,
@@ -85,3 +86,16 @@ class ControlContractTests(unittest.TestCase):
         self.assertEqual(resumed["stage"], "brief")
         fresh = self.control(dict(action="question", revision=resumed["revision"], question=self.question))
         self.assertEqual(fresh["stage"], "interview")
+
+    def test_native_resume_menu_metadata_is_not_a_question_change(self):
+        self.store.pause(1, "external_block: schema")
+        question = guide(self.project)["question"]
+        native = dict(question, isOther=True, isSecret=False)
+        for tool, arguments in [("request_user_input", {"questions": [native]}),
+                                ("functionsrequest_user_input", {"questions": [native]}),
+                                ("request_user_input", {"command": json.dumps({"questions": [native]})})]:
+            self.assertEqual(decision(self.project, {"tool_name": tool, "tool_input": arguments}), {})
+        for changed in [dict(native, id="other"), dict(native, question="different target"),
+                        dict(native, isSecret=True), dict(native, options=list(reversed(native["options"])) )]:
+            result = decision(self.project, {"tool_name": "request_user_input", "tool_input": {"questions": [changed]}})
+            self.assertEqual(result["hookSpecificOutput"]["permissionDecision"], "deny")

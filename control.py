@@ -10,6 +10,7 @@ from build_loop.director import guide, request_stage_review, confirm_stage
 from build_loop.workflow import Workflow
 from build_loop.delivery import Delivery
 from build_loop.rpc import ReadOnlyCodex, RpcError
+from build_loop.menu_input import question_matches
 import subprocess
 import sys
 
@@ -34,7 +35,7 @@ def selection_operation(store, data, operation):
             raise
         request = requests[-1]
         receipt, question, answer = read_selection(Path(data["session_file"]), data["session"], data["call"], request["question"]["id"])
-        if question != request["question"] or data["session"] != request.get("thread_id") or answer == question["options"][0]["label"]:
+        if not question_matches(request["question"], question) or data["session"] != request.get("thread_id") or answer == question["options"][0]["label"]:
             raise
         with store._write(data["revision"]) as (db, state):
             return store._event(db, state, "review_feedback", {"target": target, "question_id": question["id"],
